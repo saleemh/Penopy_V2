@@ -69,19 +69,25 @@ io.on('connection', (socket) => {
     // Load existing strokes & chat from DB
     try {
       const strokesRes = await pool.query(
-        'SELECT stroke_data FROM strokes WHERE room_id=$1 ORDER BY id ASC',
+        'SELECT stroke_data FROM strokes WHERE room_id=$1 ORDER BY created_at ASC',
         [roomId]
       );
       const chatRes = await pool.query(
-        'SELECT user_name, color, message, created_at FROM chat_messages WHERE room_id=$1 ORDER BY id ASC',
+        'SELECT user_name, color, message, created_at FROM chat_messages WHERE room_id=$1 ORDER BY created_at ASC',
         [roomId]
       );
       
       // Send existing data to the newly joined socket
       socket.emit('sessionData', {
-        strokes: strokesRes.rows.map((r) => r.stroke_data),
-        chatHistory: chatRes.rows
+        strokes: strokesRes.rows.map(row => row.stroke_data),
+        chatHistory: chatRes.rows.map(row => ({
+          user_name: row.user_name,
+          color: row.color,
+          message: row.message,
+          created_at: row.created_at
+        }))
       });
+      console.log(`Loaded ${strokesRes.rows.length} strokes and ${chatRes.rows.length} messages for room ${roomId}`);
     } catch (err) {
       console.error('Error loading existing session data:', err);
     }

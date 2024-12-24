@@ -32,6 +32,7 @@ socket.emit('joinSession', { roomId });
 
 // Listen for existing session data
 socket.on('sessionData', ({ strokes, chatHistory }) => {
+  console.log(`Received ${strokes.length} strokes and ${chatHistory.length} messages`);
   // Draw existing strokes
   strokes.forEach((stroke) => {
     drawStrokeOnCanvas(stroke, false);
@@ -106,9 +107,9 @@ function stopDrawing() {
 }
 
 function drawStrokeOnCanvas(stroke, shouldStroke) {
-  const { tool, color, startX, startY, endX, endY } = stroke;
+  const { tool, color, width, startX, startY, endX, endY } = stroke;
   ctx.beginPath();
-  ctx.lineWidth = currentWidth * (tool === 'eraser' ? 2.5 : 1); // Make eraser slightly bigger
+  ctx.lineWidth = (width || currentWidth) * (tool === 'eraser' ? 2.5 : 1);
   ctx.lineCap = 'round';
 
   if (tool === 'eraser') {
@@ -129,7 +130,7 @@ function renderUserList(users) {
   userListEl.innerHTML = '';
   const title = document.createElement('h3');
   title.className = 'panel-title';
-  title.textContent = 'Users Online';
+  title.textContent = 'Users';
   userListEl.appendChild(title);
   
   // Iterate through users and display them
