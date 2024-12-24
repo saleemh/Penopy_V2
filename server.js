@@ -81,6 +81,15 @@ io.on('connection', (socket) => {
       created_at: new Date(),
       isAI: true
     };
+    // Store AI message in DB
+    try {
+      await pool.query(
+        'INSERT INTO chat_messages (room_id, user_name, color, message) VALUES ($1, $2, $3, $4)',
+        [roomId, AI_USER.username, AI_USER.color, welcomeMsg.message]
+      );
+    } catch (err) {
+      console.error('Error saving AI welcome message:', err);
+    }
     socket.emit('chatMessage', welcomeMsg);
 
     // Load existing strokes & chat from DB
@@ -101,7 +110,8 @@ io.on('connection', (socket) => {
           user_name: row.user_name,
           color: row.color,
           message: row.message,
-          created_at: row.created_at
+          created_at: row.created_at,
+          isAI: row.user_name === AI_USER.username
         }))
       });
       console.log(`Loaded ${strokesRes.rows.length} strokes and ${chatRes.rows.length} messages for room ${roomId}`);
@@ -214,6 +224,15 @@ io.on('connection', (socket) => {
         created_at: new Date(),
         isAI: true
       };
+      // Store AI message in DB
+      try {
+        await pool.query(
+          'INSERT INTO chat_messages (room_id, user_name, color, message) VALUES ($1, $2, $3, $4)',
+          [roomId, AI_USER.username, AI_USER.color, aiMessage.message]
+        );
+      } catch (err) {
+        console.error('Error saving AI clear message:', err);
+      }
       io.to(roomId).emit('chatMessage', aiMessage);
 
       // Clear from DB

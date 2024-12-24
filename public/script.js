@@ -277,9 +277,11 @@ let lastMessageTime = null;
 let lastMessageUser = null;
 
 function addChatMessage(msg) {
+  console.log('Received chat message:', msg);
   // Check for AI messages first
   const isAIMessage = msg.isAI || msg.user_name === AI_USER?.username;
   const isMyMessage = !isAIMessage && msg.user_name === myUsername;
+  console.log('Message type:', { isAIMessage, isMyMessage });
   
   const msgDiv = document.createElement('div');
   msgDiv.className = `chat-message ${isAIMessage ? 'ai' : isMyMessage ? 'me' : 'other'}`;
@@ -396,9 +398,31 @@ function resizeCanvas() {
   const containerWidth = container.clientWidth - 40;
   const containerHeight = container.clientHeight - 40;
   
-  // Calculate scale factors
-  const scaleX = canvasWidth ? containerWidth / canvasWidth : 1;
-  const scaleY = canvasHeight ? containerHeight / canvasHeight : 1;
+  // Find the bounds of all strokes
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  strokeHistory.forEach(stroke => {
+    minX = Math.min(minX, stroke.startX, stroke.endX);
+    minY = Math.min(minY, stroke.startY, stroke.endY);
+    maxX = Math.max(maxX, stroke.startX, stroke.endX);
+    maxY = Math.max(maxY, stroke.startY, stroke.endY);
+  });
+  
+  // If there are no strokes, just resize the canvas
+  if (minX === Infinity) {
+    canvas.width = containerWidth;
+    canvas.height = containerHeight;
+    return;
+  }
+  
+  // Add padding around the drawing
+  const padding = 20;
+  const drawingWidth = maxX - minX + (padding * 2);
+  const drawingHeight = maxY - minY + (padding * 2);
+  
+  // Calculate scale to fit entire drawing
+  const scaleX = containerWidth / drawingWidth;
+  const scaleY = containerHeight / drawingHeight;
+  const scale = Math.min(scaleX, scaleY);
   
   // Store new dimensions
   canvasWidth = containerWidth;
@@ -408,14 +432,18 @@ function resizeCanvas() {
   canvas.width = containerWidth;
   canvas.height = containerHeight;
   
+  // Calculate centering offsets
+  const offsetX = (containerWidth - (drawingWidth * scale)) / 2;
+  const offsetY = (containerHeight - (drawingHeight * scale)) / 2;
+  
   // Redraw all strokes
   strokeHistory.forEach(stroke => {
     const scaledStroke = {
       ...stroke,
-      startX: stroke.startX * scaleX,
-      startY: stroke.startY * scaleY,
-      endX: stroke.endX * scaleX,
-      endY: stroke.endY * scaleY
+      startX: ((stroke.startX - minX + padding) * scale) + offsetX,
+      startY: ((stroke.startY - minY + padding) * scale) + offsetY,
+      endX: ((stroke.endX - minX + padding) * scale) + offsetX,
+      endY: ((stroke.endY - minY + padding) * scale) + offsetY
     };
     drawStrokeOnCanvas(scaledStroke, false);
   });
