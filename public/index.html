@@ -5,23 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Penopy (Alpha)</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
 
   <div id="app">
     <div id="canvas-container">
-      <canvas id="draw-canvas" width="800" height="600"></canvas>
-      <div id="toolbox">
-        <button id="pen-tool">Pen</button>
-        <button id="eraser-tool">Eraser</button>
-        <input type="color" id="color-picker" value="#000000">
-        <button id="clear-btn">Clear</button>
+      <canvas id="draw-canvas"></canvas>
+      <div class="toolbar">
+        <button class="tool-button active" data-tool="pen">
+          <i class="fas fa-pen"></i>
+          Pen
+        </button>
+        <button class="tool-button" data-tool="eraser">
+          <i class="fas fa-eraser"></i>
+          Eraser
+        </button>
+        <input type="color" class="color-picker" value="#000000">
+        <input type="range" class="stroke-width" min="1" max="50" value="3" title="Stroke Width">
+        <button class="tool-button" data-tool="clear">
+          <i class="fas fa-trash"></i>
+          Clear
+        </button>
       </div>
     </div>
 
     <div id="right-panel">
-      <div id="user-list"></div>
+      <div id="user-list">
+        <h3 class="panel-title">Users Online</h3>
+      </div>
       <div id="chat-window">
+        <h3 class="panel-title">Chat</h3>
         <div id="chat-messages"></div>
         <input type="text" id="chat-input" placeholder="Type a message...">
       </div>

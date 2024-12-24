@@ -19,15 +19,12 @@ const ctx = canvas.getContext('2d');
 const userListEl = document.getElementById('user-list');
 const chatMessagesEl = document.getElementById('chat-messages');
 const chatInputEl = document.getElementById('chat-input');
-const penToolBtn = document.getElementById('pen-tool');
-const eraserToolBtn = document.getElementById('eraser-tool');
-const colorPicker = document.getElementById('color-picker');
-const clearBtn = document.getElementById('clear-btn');
 
 let currentTool = 'pen';
 let drawing = false;
 let currentColor = '#000000';
 let startX, startY;
+let currentWidth = 2;
 
 // ----- Socket Events -----
 // Join the session
@@ -70,18 +67,24 @@ socket.on('canvasCleared', () => {
 function startDrawing(e) {
   drawing = true;
   socket.emit('drawingStatus', { roomId, isDrawing: true });
-  [startX, startY] = [e.offsetX, e.offsetY];
+  const rect = canvas.getBoundingClientRect();
+  [startX, startY] = [
+    e.clientX - rect.left,
+    e.clientY - rect.top
+  ];
 }
 
 function doDrawing(e) {
   if (!drawing) return;
-  const endX = e.offsetX;
-  const endY = e.offsetY;
+  const rect = canvas.getBoundingClientRect();
+  const endX = e.clientX - rect.left;
+  const endY = e.clientY - rect.top;
 
   // Construct stroke object
   const stroke = {
     tool: currentTool,
     color: currentColor,
+    width: currentWidth,
     startX,
     startY,
     endX,
@@ -105,7 +108,7 @@ function stopDrawing() {
 function drawStrokeOnCanvas(stroke, shouldStroke) {
   const { tool, color, startX, startY, endX, endY } = stroke;
   ctx.beginPath();
-  ctx.lineWidth = (tool === 'eraser') ? 20 : 2; // bigger lineWidth for eraser
+  ctx.lineWidth = currentWidth * (tool === 'eraser' ? 2.5 : 1); // Make eraser slightly bigger
   ctx.lineCap = 'round';
 
   if (tool === 'eraser') {
@@ -124,34 +127,80 @@ function drawStrokeOnCanvas(stroke, shouldStroke) {
 // ----- User List / Chat -----
 function renderUserList(users) {
   userListEl.innerHTML = '';
+  const title = document.createElement('h3');
+  title.className = 'panel-title';
+  title.textContent = 'Users Online';
+  userListEl.appendChild(title);
   
   // Iterate through users and display them
   for (const [socketId, user] of Object.entries(users)) {
-    const { username, color, isDrawing, isTyping } = user;
+    const { username, color, emoji = '😊', isDrawing, isTyping } = user;
     const userDiv = document.createElement('div');
-    userDiv.style.color = color;
-    userDiv.textContent = username 
-      + (isDrawing ? ' (drawing...)' : '') 
-      + (isTyping ? ' (typing...)' : '');
+    userDiv.className = `user-item${socketId === socket.id ? ' is-me' : ''}`;
+    
+    // Emoji element
+    const emojiSpan = document.createElement('span');
+    emojiSpan.className = 'user-emoji';
+    emojiSpan.textContent = emoji;
+    
+    // Username element
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'user-name';
+    nameSpan.style.color = color;
+    nameSpan.textContent = username;
+    
+    // Status element (if drawing or typing)
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'user-status';
+    if (isDrawing) statusSpan.textContent = '✏️';
+    if (isTyping) statusSpan.textContent = '💭';
+    
+    // Color picker element
+    const colorDiv = document.createElement('div');
+    colorDiv.className = 'user-color';
+    colorDiv.style.backgroundColor = color;
     
     // Make my own name clickable to rename
     if (socketId === socket.id) {
-      userDiv.style.fontWeight = 'bold';
-      userDiv.style.cursor = 'pointer';
-      userDiv.addEventListener('click', () => {
+      // Emoji click handler
+      emojiSpan.addEventListener('click', () => {
+        const newEmoji = prompt('Enter a new emoji:', emoji);
+        if (newEmoji && newEmoji.trim() !== '') {
+          socket.emit('changeEmoji', { roomId, newEmoji: newEmoji.trim() });
+        }
+      });
+      
+      // Name click handler
+      nameSpan.addEventListener('click', () => {
         const newName = prompt('Enter new username (max 10 chars):', username);
         if (newName && newName.trim() !== '') {
           socket.emit('renameUser', { roomId, newName });
         }
       });
+      
+      // Color click handler
+      colorDiv.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = color;
+        input.click();
+        input.addEventListener('change', (e) => {
+          socket.emit('changeColor', { roomId, newColor: e.target.value });
+        });
+      });
+      
+      // Add tooltips
+      emojiSpan.title = 'Click to change emoji';
+      nameSpan.title = 'Click to change name';
+      colorDiv.title = 'Click to change color';
     }
 
+    userDiv.appendChild(emojiSpan);
+    userDiv.appendChild(nameSpan);
+    userDiv.appendChild(statusSpan);
+    userDiv.appendChild(colorDiv);
     userListEl.appendChild(userDiv);
   }
-  // For MVP, we can assume the first user to join is host. 
-  // Let’s do a quick check: If I'm the user in memory as host, show the clear button:
-  // The server sets sessionSockets[roomId].hostId, but we haven't received that hostId directly.
-  // As a simpler approach, we can always show the clear button for everyone and let the server check permission.
 }
 
 // Utility function to handle a "host check" if we had a direct message from server. Skipped in MVP for brevity.
@@ -182,35 +231,85 @@ function addChatMessage(msg) {
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
 
-// ----- Tools -----
-// Set pen as active by default when page loads
-penToolBtn.classList.add('active');
-
-penToolBtn.addEventListener('click', () => {
-  penToolBtn.classList.add('active');
-  eraserToolBtn.classList.remove('active');
-  currentTool = 'pen';
-});
-
-eraserToolBtn.addEventListener('click', () => {
-  eraserToolBtn.classList.add('active');
-  penToolBtn.classList.remove('active');
-  currentTool = 'eraser';
-});
-
-colorPicker.addEventListener('input', (e) => {
-  currentColor = e.target.value;
-  socket.emit('changeColor', { roomId, newColor: currentColor });
-});
-
-// ----- Clear Button -----
-clearBtn.addEventListener('click', () => {
-  console.log('Clear button clicked', roomId);
-  socket.emit('clearCanvas', roomId);
-});
-
 // ----- Canvas Event Listeners -----
 canvas.addEventListener('mousedown', startDrawing);
 canvas.addEventListener('mousemove', doDrawing);
 canvas.addEventListener('mouseup', stopDrawing);
 canvas.addEventListener('mouseleave', stopDrawing);
+
+// Add event listeners for the new tools
+document.querySelectorAll('.tool-button').forEach(button => {
+  button.addEventListener('click', (e) => {
+    const tool = e.currentTarget.dataset.tool;
+    if (tool !== 'clear') {
+      currentTool = tool;
+      // Update active state
+      document.querySelectorAll('.tool-button').forEach(btn => 
+        btn.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+    } else {
+      // Handle clear button click
+      console.log('Clear button clicked', roomId);
+      socket.emit('clearCanvas', roomId);
+    }
+  });
+});
+
+// Color picker handler
+document.querySelector('.color-picker').addEventListener('input', (e) => {
+  currentColor = e.target.value;
+});
+
+// Stroke width handler
+document.querySelector('.stroke-width').addEventListener('input', (e) => {
+  currentWidth = parseInt(e.target.value);
+});
+
+// Update the drawing function to use these values
+function draw(e) {
+  if (!isDrawing) return;
+  
+  const x = e.clientX || e.touches[0].clientX;
+  const y = e.clientY || e.touches[0].clientY;
+  
+  ctx.lineWidth = currentWidth * (currentTool === 'eraser' ? 2.5 : 1);
+  ctx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  ctx.lineTo(x - canvas.offsetLeft, y - canvas.offsetTop);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - canvas.offsetLeft, y - canvas.offsetTop);
+}
+
+// Function to resize canvas
+function resizeCanvas() {
+  const container = document.getElementById('canvas-container');
+  const containerWidth = container.clientWidth - 40; // Account for padding
+  const containerHeight = container.clientHeight - 40;
+  
+  // Save the current drawing
+  const tempCanvas = document.createElement('canvas');
+  const tempCtx = tempCanvas.getContext('2d');
+  tempCanvas.width = canvas.width;
+  tempCanvas.height = canvas.height;
+  tempCtx.drawImage(canvas, 0, 0);
+  
+  // Resize canvas
+  canvas.width = containerWidth;
+  canvas.height = containerHeight;
+  
+  // Restore the drawing
+  ctx.drawImage(tempCanvas, 0, 0, containerWidth, containerHeight);
+  
+  // Reset context properties after resize
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+
+// Initial resize
+resizeCanvas();
+
+// Handle window resize
+window.addEventListener('resize', resizeCanvas);

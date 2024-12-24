@@ -199,6 +199,14 @@ io.on('connection', (socket) => {
     }
     console.log(`Socket ${socket.id} disconnected`);
   });
+
+  // Handle emoji change
+  socket.on('changeEmoji', ({ roomId, newEmoji }) => {
+    if (sessionSockets[roomId] && sessionSockets[roomId].users[socket.id]) {
+      sessionSockets[roomId].users[socket.id].emoji = newEmoji;
+      io.to(roomId).emit('userList', sessionSockets[roomId].users);
+    }
+  });
 });
 
 // Start server
