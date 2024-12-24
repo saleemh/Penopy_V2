@@ -35,6 +35,13 @@ app.get('/s/:roomId', (req, res) => {
 const sessionSockets = {}; 
 // Example: sessionSockets[roomId] = { hostId: <socket.id>, users: { [socket.id]: {...} }}
 
+// AI user configuration
+const AI_USER = {
+  username: 'AI',
+  color: '#9B59B6', // A pleasant purple color
+  emoji: '🤖'
+};
+
 // Socket.IO logic
 io.on('connection', (socket) => {
   socket.on('joinSession', async ({ roomId }) => {
@@ -65,6 +72,16 @@ io.on('connection', (socket) => {
       isDrawing: false,
       isTyping: false
     };
+
+    // Send AI welcome message to the new user
+    const welcomeMsg = {
+      user_name: AI_USER.username,
+      color: AI_USER.color,
+      message: "Welcome! Just start drawing, and let me know if there's anything you need. You can address me by typing @AI at the beginning of your message",
+      created_at: new Date(),
+      isAI: true
+    };
+    socket.emit('chatMessage', welcomeMsg);
 
     // Load existing strokes & chat from DB
     try {
@@ -152,6 +169,20 @@ io.on('connection', (socket) => {
   socket.on('chatMessage', async ({ roomId, message }) => {
     if (!sessionSockets[roomId]) return;
     const { username, color } = sessionSockets[roomId].users[socket.id] || {};
+
+    // Check if message is addressed to AI
+    if (message.trim().toLowerCase().startsWith('@ai')) {
+      // Process AI response (you can expand this logic)
+      const aiResponse = {
+        user_name: AI_USER.username,
+        color: AI_USER.color,
+        message: "I see you're trying to reach me! I'm here to help.",
+        created_at: new Date(),
+        isAI: true
+      };
+      io.to(roomId).emit('chatMessage', aiResponse);
+    }
+
     // store in DB
     try {
       await pool.query(
@@ -166,7 +197,7 @@ io.on('connection', (socket) => {
       user_name: username,
       color: color,
       message,
-      created_at: new Date() // or rely on DB timestamp
+      created_at: new Date()
     };
     io.to(roomId).emit('chatMessage', newMsg);
   });
@@ -175,6 +206,16 @@ io.on('connection', (socket) => {
   socket.on('clearCanvas', async (roomId) => {
     console.log('Clear canvas event received on server', roomId);
     try {
+      // Send AI message about clearing
+      const aiMessage = {
+        user_name: AI_USER.username,
+        color: AI_USER.color,
+        message: "OK then! I'll clear the page",
+        created_at: new Date(),
+        isAI: true
+      };
+      io.to(roomId).emit('chatMessage', aiMessage);
+
       // Clear from DB
       await pool.query('DELETE FROM strokes WHERE room_id = $1', [roomId]);
       

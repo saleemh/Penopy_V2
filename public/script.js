@@ -2,6 +2,12 @@
 
 const socket = io();
 
+// AI User configuration (should match server config)
+const AI_USER = {
+  username: 'AI',
+  color: '#9B59B6'
+};
+
 let roomId = null;
 
 // Parse the roomId from the current URL (e.g. /s/<roomId>)
@@ -163,8 +169,18 @@ function renderUserList(users) {
   title.textContent = 'Users';
   userListEl.appendChild(title);
   
+  // Sort users so that current user is first
+  const sortedUsers = Object.entries(users).sort(([socketId1], [socketId2]) => {
+    if (socketId1 === socket.id) return -1;
+    if (socketId2 === socket.id) return 1;
+    return 0;
+  });
+  
   // Iterate through users and display them
-  for (const [socketId, user] of Object.entries(users)) {
+  for (const [socketId, user] of sortedUsers) {
+    // Skip AI user if it somehow got into the users list
+    if (user.username === 'AI') continue;
+    
     const { username, color, emoji = '😊', isDrawing, isTyping } = user;
     const userDiv = document.createElement('div');
     userDiv.className = `user-item${socketId === socket.id ? ' is-me' : ''}`;
@@ -261,10 +277,12 @@ let lastMessageTime = null;
 let lastMessageUser = null;
 
 function addChatMessage(msg) {
-  const isMyMessage = msg.user_name === myUsername;
+  // Check for AI messages first
+  const isAIMessage = msg.isAI || msg.user_name === AI_USER?.username;
+  const isMyMessage = !isAIMessage && msg.user_name === myUsername;
   
   const msgDiv = document.createElement('div');
-  msgDiv.className = `chat-message ${isMyMessage ? 'me' : 'other'}`;
+  msgDiv.className = `chat-message ${isAIMessage ? 'ai' : isMyMessage ? 'me' : 'other'}`;
   
   // Format time
   const time = new Date(msg.created_at);
@@ -277,9 +295,9 @@ function addChatMessage(msg) {
   const showTime = !lastMessageTime || 
     timeStr !== lastMessageTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   
-  // Check if we should show the username (for others' messages)
-  const showUsername = !isMyMessage && 
-    (!lastMessageUser || lastMessageUser !== msg.user_name);
+  // For AI messages, always show the sender
+  const showUsername = (isAIMessage || (!isMyMessage && 
+    (!lastMessageUser || lastMessageUser !== msg.user_name)));
   
   msgDiv.innerHTML = `
     ${showUsername ? `<div class="message-sender" style="color:${msg.color}">${msg.user_name}</div>` : ''}

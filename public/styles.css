@@ -381,3 +381,16 @@ body {
   .message-sender + .message-content {
     margin-top: 2px;
   }
+  
+  /* AI message styling */
+  .chat-message.ai .message-content {
+    background: #9B59B6;
+    color: white;
+    border-radius: 18px;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  
+  .chat-message.ai .message-sender {
+    color: #9B59B6;
+    font-weight: 500;
+  }
