@@ -60,8 +60,18 @@ socket.on('sessionData', ({ strokes, chatHistory }) => {
   });
 });
 
+// Keep track of my username
+let myUsername = null;
+
 // Listen for user list updates
 socket.on('userList', (users) => {
+  // Update my username when user list changes
+  for (const [socketId, user] of Object.entries(users)) {
+    if (socketId === socket.id) {
+      myUsername = user.username;
+      break;
+    }
+  }
   renderUserList(users);
 });
 
@@ -245,9 +255,42 @@ chatInputEl.addEventListener('keydown', (e) => {
     socket.emit('typingStatus', { roomId, isTyping: false });
   }
 });
+
+// Keep track of last message for grouping
+let lastMessageTime = null;
+let lastMessageUser = null;
+
 function addChatMessage(msg) {
+  const isMyMessage = msg.user_name === myUsername;
+  
   const msgDiv = document.createElement('div');
-  msgDiv.innerHTML = `<strong style="color:${msg.color};">${msg.user_name}</strong>: ${msg.message} <span style="font-size:12px; color:#888;">[${new Date(msg.created_at).toLocaleTimeString()}]</span>`;
+  msgDiv.className = `chat-message ${isMyMessage ? 'me' : 'other'}`;
+  
+  // Format time
+  const time = new Date(msg.created_at);
+  const timeStr = time.toLocaleTimeString([], { 
+    hour: 'numeric', 
+    minute: '2-digit'
+  });
+  
+  // Check if we should show the timestamp
+  const showTime = !lastMessageTime || 
+    timeStr !== lastMessageTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  
+  // Check if we should show the username (for others' messages)
+  const showUsername = !isMyMessage && 
+    (!lastMessageUser || lastMessageUser !== msg.user_name);
+  
+  msgDiv.innerHTML = `
+    ${showUsername ? `<div class="message-sender" style="color:${msg.color}">${msg.user_name}</div>` : ''}
+    <div class="message-content">${msg.message}</div>
+    ${showTime ? `<div class="message-time">${timeStr}</div>` : ''}
+  `;
+  
+  // Update last message info
+  lastMessageTime = time;
+  lastMessageUser = msg.user_name;
+  
   chatMessagesEl.appendChild(msgDiv);
   chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 }
