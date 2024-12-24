@@ -1,0 +1,19 @@
+{
+    "name": "penopy_v2",
+    "version": "1.0.0",
+    "description": "",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "express": "^4.21.2",
+        "path": "^0.12.7",
+        "pg": "^8.13.1",
+        "socket.io": "^4.8.1",
+        "uuid": "^11.0.3"
+    }
+}

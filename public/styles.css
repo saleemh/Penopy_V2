@@ -1,0 +1,106 @@
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background: #f0f0f0;
+  }
+  
+  #app {
+    display: flex;
+    height: 100vh;
+  }
+  
+  #canvas-container {
+    flex: 1;
+    background: #fff;
+    position: relative;
+  }
+  
+  #draw-canvas {
+    border: 1px solid #ccc;
+    display: block;
+    margin: 20px auto;
+  }
+  
+  #toolbox {
+    text-align: center;
+    padding: 10px;
+    background: #f8f8f8;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  #toolbox button {
+    padding: 8px 16px;
+    margin: 0 5px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  #toolbox button:hover {
+    background: #f0f0f0;
+    border-color: #ccc;
+  }
+  
+  /* Active state for tool buttons */
+  #toolbox button.active {
+    background: #4CAF50;
+    color: white;
+    border-color: #45a049;
+  }
+  
+  /* Specific styling for clear button */
+  #clear-btn {
+    background: #ff4444 !important;
+    color: white !important;
+    border-color: #ff3333 !important;
+  }
+  
+  #clear-btn:hover {
+    background: #ff3333 !important;
+    border-color: #ff2222 !important;
+  }
+  
+  /* Color picker styling */
+  #color-picker {
+    padding: 2px;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    vertical-align: middle;
+    cursor: pointer;
+  }
+  
+  #right-panel {
+    width: 300px;
+    background: #e8e8e8;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  #user-list {
+    padding: 10px;
+    height: 30%;
+    overflow-y: auto;
+    border-bottom: 1px solid #ccc;
+  }
+  
+  #chat-window {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+  
+  #chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+  }
+  
+  #chat-input {
+    border: none;
+    padding: 10px;
+    font-size: 14px;
+  }
