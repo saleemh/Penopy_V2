@@ -30,9 +30,26 @@ let currentWidth = 2;
 // Join the session
 socket.emit('joinSession', { roomId });
 
+// Debounce function to handle resize events
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Store all strokes in memory for redrawing
+let strokeHistory = [];
+
 // Listen for existing session data
 socket.on('sessionData', ({ strokes, chatHistory }) => {
   console.log(`Received ${strokes.length} strokes and ${chatHistory.length} messages`);
+  strokeHistory = strokes;
   // Draw existing strokes
   strokes.forEach((stroke) => {
     drawStrokeOnCanvas(stroke, false);
@@ -50,6 +67,7 @@ socket.on('userList', (users) => {
 
 // Listen for new strokes from other users
 socket.on('draw', (stroke) => {
+  strokeHistory.push(stroke);
   drawStrokeOnCanvas(stroke, false);
 });
 
@@ -62,6 +80,7 @@ socket.on('chatMessage', (msg) => {
 socket.on('canvasCleared', () => {
   console.log('Canvas cleared event received');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  strokeHistory = [];
 });
 
 // ----- Drawing Functions -----
@@ -70,16 +89,16 @@ function startDrawing(e) {
   socket.emit('drawingStatus', { roomId, isDrawing: true });
   const rect = canvas.getBoundingClientRect();
   [startX, startY] = [
-    e.clientX - rect.left,
-    e.clientY - rect.top
+    (e.clientX || e.pageX) - rect.left,
+    (e.clientY || e.pageY) - rect.top
   ];
 }
 
 function doDrawing(e) {
   if (!drawing) return;
   const rect = canvas.getBoundingClientRect();
-  const endX = e.clientX - rect.left;
-  const endY = e.clientY - rect.top;
+  const endX = (e.clientX || e.pageX) - rect.left;
+  const endY = (e.clientY || e.pageY) - rect.top;
 
   // Construct stroke object
   const stroke = {
@@ -94,6 +113,7 @@ function doDrawing(e) {
 
   // Draw locally
   drawStrokeOnCanvas(stroke, true);
+  strokeHistory.push(stroke);
 
   // Emit to server
   socket.emit('draw', { roomId, stroke });
@@ -238,6 +258,27 @@ canvas.addEventListener('mousemove', doDrawing);
 canvas.addEventListener('mouseup', stopDrawing);
 canvas.addEventListener('mouseleave', stopDrawing);
 
+// Add touch support
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault(); // Prevent scrolling while drawing
+  startDrawing(e.touches[0]);
+});
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  doDrawing(e.touches[0]);
+});
+
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  stopDrawing();
+});
+
+canvas.addEventListener('touchcancel', (e) => {
+  e.preventDefault();
+  stopDrawing();
+});
+
 // Add event listeners for the new tools
 document.querySelectorAll('.tool-button').forEach(button => {
   button.addEventListener('click', (e) => {
@@ -284,25 +325,39 @@ function draw(e) {
   ctx.moveTo(x - canvas.offsetLeft, y - canvas.offsetTop);
 }
 
+// Keep track of canvas dimensions for scaling
+let canvasWidth = 0;
+let canvasHeight = 0;
+
 // Function to resize canvas
 function resizeCanvas() {
   const container = document.getElementById('canvas-container');
-  const containerWidth = container.clientWidth - 40; // Account for padding
+  const containerWidth = container.clientWidth - 40;
   const containerHeight = container.clientHeight - 40;
   
-  // Save the current drawing
-  const tempCanvas = document.createElement('canvas');
-  const tempCtx = tempCanvas.getContext('2d');
-  tempCanvas.width = canvas.width;
-  tempCanvas.height = canvas.height;
-  tempCtx.drawImage(canvas, 0, 0);
+  // Calculate scale factors
+  const scaleX = canvasWidth ? containerWidth / canvasWidth : 1;
+  const scaleY = canvasHeight ? containerHeight / canvasHeight : 1;
+  
+  // Store new dimensions
+  canvasWidth = containerWidth;
+  canvasHeight = containerHeight;
   
   // Resize canvas
   canvas.width = containerWidth;
   canvas.height = containerHeight;
   
-  // Restore the drawing
-  ctx.drawImage(tempCanvas, 0, 0, containerWidth, containerHeight);
+  // Redraw all strokes
+  strokeHistory.forEach(stroke => {
+    const scaledStroke = {
+      ...stroke,
+      startX: stroke.startX * scaleX,
+      startY: stroke.startY * scaleY,
+      endX: stroke.endX * scaleX,
+      endY: stroke.endY * scaleY
+    };
+    drawStrokeOnCanvas(scaledStroke, false);
+  });
   
   // Reset context properties after resize
   ctx.lineCap = 'round';
@@ -310,7 +365,9 @@ function resizeCanvas() {
 }
 
 // Initial resize
+canvasWidth = canvas.width;
+canvasHeight = canvas.height;
 resizeCanvas();
 
 // Handle window resize
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', debounce(resizeCanvas, 250));
